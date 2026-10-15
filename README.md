@@ -12,6 +12,76 @@ Repositorio en GitHub:
 
 <https://github.com/saulPariona/Semana-7-Aguilar-parte-2.git>
 
+## 1. Diagrama de flujo de estado y ciclo de render
+
+```text
+<App />
+└── <ThemeProvider> (ThemeContext.tsx)
+    ├── useLocalStorage('dashboard_theme', 'light')
+    ├── useEffect: aplica la clase del tema al <body> y ejecuta cleanup
+    └── useCallback: estabiliza toggleTheme()
+        │
+        ▼
+    <Dashboard> (App.tsx)
+    ├── useContext(ThemeContext): consume el tema global
+    ├── useLocalStorage('dashboard_tasks'): persiste la lista
+    ├── useReducer(tasksReducer, initialTaskState)
+    │   ├── Estado: { items: [], filter: 'all', sort: 'asc' }
+    │   └── Acciones: ADD, REMOVE, TOGGLE, FILTER y SORT
+    ├── useCallback: estabiliza las acciones de tareas
+    └── useState(showTaskView): simula desmontaje y cleanup
+        │
+        ▼
+    <TaskList> (TaskList.tsx)
+    ├── useState: controla el texto del formulario
+    ├── useRef: conserva referencias y aplica auto-focus
+    ├── useEffect: enfoca el input y libera el timer al desmontar
+    ├── useMemo: filtra y ordena la lista procesada
+    └── useCallback: estabiliza el envío del formulario
+        │
+        ▼
+    <TaskItem>
+    └── recibe la tarea y handlers mediante props
+```
+
+El flujo es unidireccional: el usuario genera una acción, el reducer produce un nuevo estado, `App` persiste los datos y `TaskList` recibe las props actualizadas para renderizar la vista correspondiente.
+
+## 2. Justificación técnica de cada hook utilizado
+
+### ¿Por qué no utilizar solamente `useState`?
+
+`useState` es adecuado para estados simples, pero este dashboard administra una estructura relacionada con tres partes: tareas, filtro y orden. Además, varias operaciones dependen del estado anterior y deben conservar actualizaciones inmutables. Un único `useState` produciría lógica dispersa en varios handlers y aumentaría el riesgo de actualizar una parte sin sincronizar las demás.
+
+Por ese motivo se utiliza `useReducer` para centralizar las transiciones y `useState` únicamente donde resuelve estados locales sencillos, como el texto del formulario y la visibilidad temporal de la lista.
+
+### `useReducer`
+
+Administra el estado complejo `{ items, filter, sort }` mediante las acciones `ADD`, `REMOVE`, `TOGGLE`, `FILTER` y `SORT`. Centraliza la lógica de negocio en una función pura, facilita la trazabilidad y evita mutaciones accidentales.
+
+### `useContext`
+
+Comparte `theme` y `toggleTheme` entre los componentes sin pasar propiedades manualmente por cada nivel del árbol. Esto evita prop drilling para una configuración global de la interfaz.
+
+### `useEffect`
+
+Ejecuta operaciones externas al render puro: sincronización con `localStorage`, actualización de la clase del `body` y creación del timer de `TaskList`. Sus funciones de cleanup eliminan clases y timers cuando cambian las dependencias o se desmonta la vista.
+
+### `useMemo`
+
+Memoriza `processedTasks`, que filtra y ordena las tareas. Así no se repite el cálculo cada vez que el usuario escribe una letra en el input si las tareas, el filtro y el orden no cambiaron.
+
+### `useCallback`
+
+Conserva las referencias de `addTask`, `removeTask`, `toggleTask` y `handleSubmit`. Esto evita crear funciones nuevas innecesariamente y permite que los componentes hijos reciban handlers estables.
+
+### `useRef`
+
+Mantiene la referencia del input y el conteo anterior de tareas sin provocar renders adicionales. Después de agregar una tarea permite devolver el foco directamente al campo de texto.
+
+### `useLocalStorage`
+
+Encapsula la lectura inicial y la escritura persistente con `JSON.parse`, `JSON.stringify` y manejo explícito de errores. Se reutiliza para guardar el tema y las tareas sin duplicar lógica.
+
 ## Descripción
 
 Este proyecto es un dashboard de gestión de tareas desarrollado con React, TypeScript, Vite y React Hooks. Permite crear, completar, eliminar, filtrar y ordenar tareas. También incluye persistencia con `localStorage`, cambio de tema claro y noche, auto-focus del formulario y alertas visibles para las acciones principales.
@@ -132,64 +202,6 @@ Semana-7-Aguilar-parte-2/
 ├── tsconfig.json
 └── vite.config.ts
 ```
-
-## Arquitectura de estado
-
-```text
-App
-└── ThemeProvider
-    └── Dashboard
-        ├── useReducer: tareas, filtros y orden
-        ├── useLocalStorage: persistencia
-        └── TaskList
-            ├── useState: texto del formulario
-            ├── useRef: auto-focus y conteo anterior
-            ├── useEffect: timer y cleanup
-            ├── useMemo: filtrado y ordenamiento
-            └── Lucide React: iconos de la interfaz
-```
-
-## Hooks implementados
-
-### `useReducer`
-
-Se utiliza en `useTasksReducer.ts` para centralizar las acciones:
-
-- `ADD`
-- `REMOVE`
-- `TOGGLE`
-- `FILTER`
-- `SORT`
-
-Esto mantiene las actualizaciones inmutables y organiza el estado compuesto de tareas.
-
-### `useContext`
-
-`ThemeContext.tsx` comparte el tema y la función `toggleTheme` con el dashboard sin prop drilling.
-
-### `useEffect`
-
-Se utiliza para:
-
-- Sincronizar tareas con `localStorage`.
-- Aplicar la clase del tema al elemento `body`.
-- Liberar el timer cuando `TaskList` se desmonta.
-
-### `useMemo`
-
-Memoriza la lista procesada para evitar recalcular filtros y ordenamiento cuando no cambiaron las tareas, el filtro o el orden.
-
-### `useCallback`
-
-Estabiliza las funciones para agregar, eliminar y completar tareas.
-
-### `useRef`
-
-Devuelve el foco al campo de texto después de agregar una tarea sin provocar un render adicional.
-
-### `useLocalStorage`
-
-Encapsula la lectura y escritura de datos con `JSON.parse`, `JSON.stringify` y manejo explícito de errores.
 
 ## Criterios de implementación
 
